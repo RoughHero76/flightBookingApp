@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome, Admin</title>
+</head>
+
+<body>
+
+    <h1>Welcome, Admin: {{ username }}</h1>
+
+    <p>Welcome to the admin dashboard</p>
+
+    <!-- Form for adding a flight -->
+    <form id="addFlightForm">
+        <h2>Add a Flight</h2>
+        <label for="flightNumber">Flight Number:</label>
+        <input type="text" id="flightNumber" name="flightNumber" required><br>
+        <label for="departure">Departure:</label>
+        <input type="text" id="departure" name="departure" required><br>
+        <label for="destination">Destination:</label>
+        <input type="text" id="destination" name="destination" required><br>
+        <label for="date">Date:</label>
+        <input type="date" id="date" name="date" required><br>
+        <label for="time">Time:</label>
+        <input type="time" id="time" name="time" required><br>
+        <button type="submit">Add Flight</button>
+    </form>
+
+    <!-- Form for removing a flight -->
+    <form id="removeFlightForm">
+        <h2>Remove a Flight</h2>
+        <label for="flightId">Flight ID:</label>
+        <input type="text" id="flightId" name="flightId" required><br>
+        <button type="submit">Remove Flight</button>
+    </form>
+
+    <!-- Form for viewing bookings by flight -->
+    <form id="viewBookingsForm">
+        <h2>View Bookings by Flight</h2>
+        <label for="flightNumberView">Flight Number:</label>
+        <input type="text" id="flightNumberView" name="flightNumberView" required><br>
+        <button type="submit">View Bookings</button>
+    </form>
+
+    <!-- Container to display bookings -->
+    <div id="bookingResults"></div>
+
+    <div id="message"> </div>
+
+
+    <button onclick="logout()"> Logout </button>
+    <script>
+
+
+        function logout() {
+            localStorage.removeItem("token"); // Remove the token from local storage
+            window.location.href = "/"; // Redirect to logout route
+        }
+
+        function showMessage(message, isError) {
+            const messageElement = document.getElementById("message");
+            messageElement.textContent = message;
+            messageElement.style.color = isError ? "red" : "green";
+            messageElement.style.display = "block"; // Ensure the message is visible
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+            // Add event listener for adding flight form submission
+            document.getElementById("addFlightForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                const flightNumber = document.getElementById("flightNumber").value;
+                const departure = document.getElementById("departure").value;
+                const destination = document.getElementById("destination").value;
+                const date = document.getElementById("date").value;
+                const time = document.getElementById("time").value;
+
+                // Send request to backend route for adding flight
+
+                fetch("/add_flight", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    },
+                    body: JSON.stringify({
+                        flight_number: flightNumber,
+                        departure: departure,
+                        destination: destination,
+                        date: date,
+                        time: time
+                    })
+                })
+                    .then(response => {
+                        return response.json().then(data => {
+                            if (!response.ok) {
+                                // If it's an error response, throw an error with the error message
+                                throw new Error(data.error);
+                            }
+                            // If it's a success response, return the data (which may contain a message)
+                            return data;
+                        });
+                    })
+                    .then(data => {
+                        // Display the message from the response body
+                        showMessage(data.message, false);
+                    })
+                    .catch(error => {
+                        // Display the error message
+                        showMessage(error.message, true);
+                    });
+            });
+
+            // Add event listener for removing flight form submission
+            document.getElementById("removeFlightForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                const flightId = document.getElementById("flightId").value;
+
+                // Send request to backend route for removing flight
+                fetch("/remove_flight", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    },
+                    body: JSON.stringify({
+                        flight_id: flightId
+                    })
+                })
+                    .then(response => {
+                        return response.json().then(data => {
+                            if (!response.ok) {
+                                // If it's an error response, throw an error with the error message
+                                throw new Error(data.error);
+                            }
+                            // If it's a success response, return the data (which may contain a message)
+                            return data;
+                        });
+                    })
+                    .then(data => {
+                        // Display the message from the response body
+                        showMessage(data.message, false);
+                    })
+                    .catch(error => {
+                        // Display the error message
+                        showMessage(error.message, true);
+                    });
+            });
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // Add event listener for viewing bookings form submission
+            document.getElementById("viewBookingsForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                const flightNumberView = document.getElementById("flightNumberView").value;
+
+                // Send request to backend route for fetching bookings by flight
+                fetch("/view_bookings_by_flight?flight_number=" + flightNumberView, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Display the bookings in a table format
+                        const bookingResults = document.getElementById("bookingResults");
+                        bookingResults.innerHTML = ""; // Clear previous results
+                        if (data.error) {
+                            // If there's an error, display it
+                            bookingResults.textContent = data.error;
+                        } else {
+                            // If there are bookings, display them in a table
+                            const table = document.createElement("table");
+                            table.innerHTML = `
+                    <tr>
+                        <th>Username</th>
+                        <th>Flight Number</th>
+                        <th>Departure</th>
+                        <th>Destination</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                    </tr>
+                `;
+                            data.forEach(booking => {
+                                const row = table.insertRow();
+                                row.innerHTML = `
+                        <td>${booking.username}</td>
+                        <td>${booking.flight_number}</td>
+                        <td>${booking.departure}</td>
+                        <td>${booking.destination}</td>
+                        <td>${booking.date}</td>
+                        <td>${booking.time}</td>
+                    `;
+                            });
+                            bookingResults.appendChild(table);
+                        }
+                    })
+                    .catch(error => {
+                        // Display any errors that occur during the fetch request
+                        const bookingResults = document.getElementById("bookingResults");
+                        bookingResults.textContent = "Error fetching bookings: " + error.message;
+                    });
+            });
+        });
+
+
+    </script>
+
+</body>
+
+</html>

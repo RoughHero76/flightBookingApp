@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard User</title>
+</head>
+
+<body>
+
+    <h1>Welcome, {{ username }}</h1>
+
+    <h2>Search for Flights</h2>
+    <form id="searchFlightsForm">
+        <label for="date">Date:</label>
+        <input type="date" id="date" name="date" required>
+
+        <label for="time">Time (optional):</label>
+        <input type="time" id="time" name="time">
+
+        <input type="submit" value="Search">
+    </form>
+
+    <h2>Your Bookings</h2>
+    <ul id="bookingsList"></ul>
+
+    <button onclick=fetchBookings()> My Books </button>
+    <h2>Available Flights</h2>
+    <ul id="flightsList"></ul>
+
+    <div id="message"> </div>
+
+    <button onclick="logout()">Logout</button>
+
+    <script>
+
+        function logout() {
+            localStorage.removeItem("token"); // Remove the token from local storage
+            window.location.href = "/"; // Redirect to logout route
+        }
+        // Define the showMessage function
+        function showMessage(message, isError) {
+            const messageElement = document.getElementById("message");
+            messageElement.textContent = message;
+            messageElement.style.color = isError ? "red" : "green";
+            messageElement.style.display = "block"; // Ensure the message is visible
+        }
+
+        function bookFlight(flightId) {
+            // Send request to backend route for booking a flight
+            fetch("/book_flight", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                },
+                body: JSON.stringify({
+                    flight_id: flightId
+                })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        // If the status is not OK, convert the response to JSON and return a rejected Promise
+                        return response.json().then(json => Promise.reject(json));
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Show the success message
+                    showMessage(data.message, false);
+                })
+                .catch(error => {
+                    // Show the error message
+                    showMessage(error.message || error.error, true);
+                });
+        }
+
+        document.getElementById("searchFlightsForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+            const date = document.getElementById("date").value;
+            const time = document.getElementById("time").value || null;
+
+            // Send request to backend route for searching flights
+            fetch("/search_flights", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                },
+                body: JSON.stringify({
+                    date: date,
+                    time: time
+                })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        // If the status is not OK, convert the response to JSON and return a rejected Promise
+                        return response.json().then(json => Promise.reject(json));
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Handle the response data
+                    const flightsList = document.getElementById("flightsList");
+                    flightsList.innerHTML = ""; // Clear the list
+
+                    data.forEach(flight => {
+                        const listItem = document.createElement("li");
+                        listItem.textContent = `Flight Time: ${flight.time}, From: ${flight.departure} To: ${flight.destination}, Date: ${flight.date}`;
+
+                        // Add a "Book" button for each flight
+                        const bookButton = document.createElement("button");
+                        bookButton.textContent = "Book";
+                        bookButton.addEventListener("click", function () {
+                            bookFlight(flight.flight_number);  // Book the flight when the button is clicked
+                        });
+
+                        listItem.appendChild(bookButton);
+                        flightsList.appendChild(listItem);
+                    });
+                })
+                .catch(error => {
+                    // Show the error message
+                    showMessage(error.message, true);
+                });
+        });
+
+        function fetchBookings() {
+            // Send request to backend route for fetching bookings
+            fetch("/fetch_bookings", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        // If the status is not OK, convert the response to JSON and throw an error
+                        return response.json().then(json => {
+                            throw new Error(json.error);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Handle the response data
+                    const bookingsList = document.getElementById("bookingsList");
+                    bookingsList.innerHTML = ""; // Clear the list
+
+                    if (Array.isArray(data) && data.length) {
+                        data.forEach(booking => {
+                            const listItem = document.createElement("li");
+                            listItem.textContent = `Flight Time: ${booking.time}, From: ${booking.departure} To: ${booking.destination}, Date: ${booking.date}`;
+                            bookingsList.appendChild(listItem);
+                        });
+                    } else {
+                        showMessage("You have no bookings", false);
+                    }
+                })
+                .catch(error => {
+                    // Show the error message
+                    showMessage(error.message, true);
+                });
+        }
+
+    </script>
+</body>
+
+</html>
